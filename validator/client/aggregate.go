@@ -44,7 +44,7 @@ func (v *validator) SubmitAggregateAndProof(ctx context.Context, slot primitives
 	}
 
 	// Avoid sending beacon node duplicated aggregation requests.
-	k := validatorSubscribeKey(slot, duty.CommitteeIndex)
+	k := validatorSubnetSubscriptionKey(slot, duty.CommitteeIndex)
 	v.aggregatedSlotCommitteeIDCacheLock.Lock()
 	if v.aggregatedSlotCommitteeIDCache.Contains(k) {
 		v.aggregatedSlotCommitteeIDCacheLock.Unlock()
@@ -55,7 +55,7 @@ func (v *validator) SubmitAggregateAndProof(ctx context.Context, slot primitives
 
 	var slotSig []byte
 	if v.distributed {
-		slotSig, err = v.getAttSelection(attSelectionKey{slot: slot, index: duty.ValidatorIndex})
+		slotSig, err = v.attSelection(attSelectionKey{slot: slot, index: duty.ValidatorIndex})
 		if err != nil {
 			log.WithError(err).Error("Could not find aggregated selection proof")
 			if v.emitAccountMetrics {
@@ -138,6 +138,9 @@ func (v *validator) SubmitAggregateAndProof(ctx context.Context, slot primitives
 
 // Signs input slot with domain selection proof. This is used to create the signature for aggregator selection.
 func (v *validator) signSlotWithSelectionProof(ctx context.Context, pubKey [fieldparams.BLSPubkeyLength]byte, slot primitives.Slot) (signature []byte, err error) {
+	ctx, span := trace.StartSpan(ctx, "validator.signSlotWithSelectionProof")
+	defer span.End()
+
 	domain, err := v.domainData(ctx, slots.ToEpoch(slot), params.BeaconConfig().DomainSelectionProof[:])
 	if err != nil {
 		return nil, err
@@ -149,7 +152,7 @@ func (v *validator) signSlotWithSelectionProof(ctx context.Context, pubKey [fiel
 	if err != nil {
 		return nil, err
 	}
-	sig, err = v.keyManager.Sign(ctx, &validatorpb.SignRequest{
+	sig, err = v.km.Sign(ctx, &validatorpb.SignRequest{
 		PublicKey:       pubKey[:],
 		SigningRoot:     root[:],
 		SignatureDomain: domain.SignatureDomain,
@@ -194,6 +197,9 @@ func (v *validator) waitToSlotTwoThirds(ctx context.Context, slot primitives.Slo
 // This returns the signature of validator signing over aggregate and
 // proof object.
 func (v *validator) aggregateAndProofSig(ctx context.Context, pubKey [fieldparams.BLSPubkeyLength]byte, agg *ethpb.AggregateAttestationAndProof, slot primitives.Slot) ([]byte, error) {
+	ctx, span := trace.StartSpan(ctx, "validator.aggregateAndProofSig")
+	defer span.End()
+
 	d, err := v.domainData(ctx, slots.ToEpoch(agg.Aggregate.Data.Slot), params.BeaconConfig().DomainAggregateAndProof[:])
 	if err != nil {
 		return nil, err
@@ -203,7 +209,7 @@ func (v *validator) aggregateAndProofSig(ctx context.Context, pubKey [fieldparam
 	if err != nil {
 		return nil, err
 	}
-	sig, err = v.keyManager.Sign(ctx, &validatorpb.SignRequest{
+	sig, err = v.km.Sign(ctx, &validatorpb.SignRequest{
 		PublicKey:       pubKey[:],
 		SigningRoot:     root[:],
 		SignatureDomain: d.SignatureDomain,
