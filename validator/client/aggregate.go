@@ -177,7 +177,7 @@ func (v *validator) SubmitAggregateAndProof(ctx context.Context, slot primitives
 		}
 	}
 
-	if err := v.saveSubmittedAtt(agg.GetAggregateVal().GetData(), pubKey[:], true); err != nil {
+	if err := v.saveSubmittedAtt(agg.AggregateVal().GetData(), pubKey[:], true); err != nil {
 		log.WithError(err).Error("Could not add aggregator indices to logs")
 		if v.emitAccountMetrics {
 			ValidatorAggFailVec.WithLabelValues(fmtKey).Inc()
@@ -267,7 +267,7 @@ func (v *validator) aggregateAndProofSig(ctx context.Context, pubKey [fieldparam
 		if !ok {
 			return nil, fmt.Errorf("wrong aggregate type (expected %T, got %T)", &ethpb.AggregateAttestationAndProof{}, agg)
 		}
-		sig, err = v.keyManager.Sign(ctx, &validatorpb.SignRequest{
+		sig, err = v.km.Sign(ctx, &validatorpb.SignRequest{
 			PublicKey:       pubKey[:],
 			SigningRoot:     root[:],
 			SignatureDomain: d.SignatureDomain,
@@ -279,7 +279,7 @@ func (v *validator) aggregateAndProofSig(ctx context.Context, pubKey [fieldparam
 		if !ok {
 			return nil, fmt.Errorf("wrong aggregate type (expected %T, got %T)", &ethpb.AggregateAttestationAndProofElectra{}, agg)
 		}
-		sig, err = v.keyManager.Sign(ctx, &validatorpb.SignRequest{
+		sig, err = v.km.Sign(ctx, &validatorpb.SignRequest{
 			PublicKey:       pubKey[:],
 			SigningRoot:     root[:],
 			SignatureDomain: d.SignatureDomain,
